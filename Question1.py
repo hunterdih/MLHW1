@@ -45,7 +45,7 @@ def get_discriminant(data0, data1, m0=m_0, C0=C_0, pl0=PL0, m1=m_1, C1=C_1, pl1=
                            multivariate_normal.pdf(data0[i], m1, C1) / multivariate_normal.pdf(data0[i], m0, C0))
     for i in range(int(pl1 * smpl) - 1):
         disc_1 = np.append(disc_1,
-                           multivariate_normal.pdf(data1[i], m1, C1) / multivariate_normal.pdf(data1[i], m_0, C0))
+                           multivariate_normal.pdf(data1[i], m1, C1) / multivariate_normal.pdf(data1[i], m0, C0))
 
     return disc_0, disc_1
 
