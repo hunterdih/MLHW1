@@ -11,15 +11,14 @@ import pandas as pd
 
 def get_confusion_matrix_loss(lm, sample_size, priors):
     loss = 0
-    dlm = lm
+    dlm = np.copy(lm)
     for i in range(np.shape(lm)[0]):
         for j in range(np.shape(lm)[1]):
             if i != j:
                 loss += lm[i][j]
     for index in range(np.shape(lm)[0]):
-        lm[index] = [x / (priors[index] * sample_size) for x in lm[index]]
         dlm[index] = [round(x / (priors[index] * sample_size), 4) for x in lm[index]]
-    return lm, dlm, loss / sample_size
+    return dlm, loss / sample_size
 
 
 def get_dataset_average(dataset):
@@ -66,14 +65,14 @@ def reduce_feature_size(dataset, n_features, class_prior):
     PCA3 = PCA(n_components=n_features).fit_transform(dataset)
     column_names = []
     for i in range(n_features):
-        column_names.append(f'Principle Component {i+1}')
+        column_names.append(f'Principle Component {i + 1}')
     PCA3_dataframe = pd.DataFrame(data=PCA3,
                                   columns=column_names)
     PCA3_dataframe[class_prior] = class_column
     return PCA3_dataframe
 
 
-def generate_pca_graphs(dataset, class_prior):
+def generate_graphs(dataset, class_prior, confusion_mat):
     class_column = dataset[class_prior]
     guess_column = dataset['Guess']
     dataset = dataset.drop(columns=[class_prior])
@@ -182,6 +181,14 @@ def generate_pca_graphs(dataset, class_prior):
     ax.set_ylabel('Principle Component 2')
     ax.set_zlabel('Principle Component 3')
     ax.legend()
+
+    fig3, ax = plt.subplots()
+    ax.matshow(confusion_mat, cmap=plt.cm.Blues)
+    for i in range(np.shape(confusion_mat)[0]):
+        for j in range(np.shape(confusion_mat)[1]):
+            c = confusion_mat[j, i]
+            ax.text(i, j, str(c), va='center', ha='center')
+
     plt.show()
     return PCA3_dataframe
 
@@ -189,10 +196,10 @@ def generate_pca_graphs(dataset, class_prior):
 if __name__ == '__main__':
     shrink_feature_set = False
     wine_dataset_path = Path(
-        r'C:\Users\dihdd\OneDrive\Northeastern Classes\Graduate\EECE5644MachineLearning\Homework1\winequality-white.csv')
-    wine_dataset = read_csv(wine_dataset_path, delimiter=';')
+        r'C:\Users\David Hunter\OneDrive\Northeastern Classes\Graduate\EECE5644MachineLearning\Homework1\HumanActivityData.csv')
+    wine_dataset = read_csv(wine_dataset_path, delimiter=',')
     entries = wine_dataset.shape[0]
-    prior_variable = 'quality'
+    prior_variable = 'Activity'
     min_value = wine_dataset[prior_variable].min()
     max_value = wine_dataset[prior_variable].max() + 1
     print(f'Wine Dataset Loaded...\nTotal Entries: {entries}')
@@ -204,7 +211,7 @@ if __name__ == '__main__':
     print(f'Class Priors Calculated (Assuming Scores Are Classes)...')
 
     if shrink_feature_set:
-        wine_dataset = reduce_feature_size(wine_dataset, 3, prior_variable)
+        wine_dataset = reduce_feature_size(wine_dataset, 10, prior_variable)
 
     features = wine_dataset.shape[1] - 1
     regularization_alpha = 0.5
@@ -246,7 +253,7 @@ if __name__ == '__main__':
     print(f'Calculating Covariance Matrices and Regularization Factor')
     for label in labeled_dataset:
         current_covariance_matrix = label.cov()
-        dataset_covariances.append(current_covariance_matrix)
+        dataset_covariances.append(current_covariance_matrix.values)
         lmda = regularization_alpha * np.trace(current_covariance_matrix.to_numpy()) / np.linalg.matrix_rank(
             current_covariance_matrix.to_numpy())
         current_covariances_regularized = current_covariance_matrix + lmda * id_matrix
@@ -272,17 +279,16 @@ if __name__ == '__main__':
     # Test sample-map
     guess_dataset, loss_matrix_update = classify_map(labeled_dataset, lambda_matrix, loss_matrix, averaged_dataset,
                                                      regularized_dataset_covariances, wine_priors)
-
+    # guess_dataset, loss_matrix_update = classify_map_mat(labeled_dataset, lambda_matrix, loss_matrix, averaged_dataset, regularized_dataset_covariances, wine_priors)
     print(f'Testing on MAP Classifier Done...')
-
+    print(f'Sum of loss_matrix_update: {np.sum(loss_matrix_update)}')
     print(f'_________________________________________')
     print(f'Calculating Number Correct and Number Incorrect Done...')
 
     print(f'Calculating Confusion Matrix')
-    confusion_matrix, display_confusion_matrix, loss = get_confusion_matrix_loss(loss_matrix_update, entries,
-                                                                                 wine_priors)
+    display_confusion_matrix, loss = get_confusion_matrix_loss(loss_matrix_update, entries, wine_priors)
     rounded_loss = round(loss, 4)
     print(f'Loss: {rounded_loss * 100}%')
     print(f'Confusion Matrix:\n{display_confusion_matrix}')
 
-    pca_data = generate_pca_graphs(guess_dataset, prior_variable)
+    pca_data = generate_graphs(guess_dataset, prior_variable, display_confusion_matrix)
